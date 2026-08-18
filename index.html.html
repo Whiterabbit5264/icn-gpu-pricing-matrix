@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>GPU Pricing Matrix</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --green:#22C55E;
+    --green-dark:#16A34A;
+    --ink:#111318;
+    --gray-700:#4B5157;
+    --gray-500:#8A9099;
+    --gray-300:#E4E6EA;
+    --gray-100:#F4F5F7;
+    --page:#EDEFF2;
+    --card:#FFFFFF;
+    --radius:20px;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; padding:0;
+    background:var(--page);
+    font-family:'Inter',system-ui,-apple-system,sans-serif;
+    color:var(--ink);
+  }
+  .wrap{
+    max-width:1040px;
+    margin:0 auto;
+    padding:48px 32px 80px;
+  }
+  h1{
+    font-size:26px;
+    font-weight:800;
+    letter-spacing:-0.01em;
+    margin:0 0 6px;
+  }
+  .sub{
+    color:var(--gray-500);
+    font-size:14px;
+    margin:0 0 24px;
+  }
+
+  /* Tabs */
+  .tabs{
+    display:flex;
+    gap:6px;
+    background:var(--gray-100);
+    border-radius:999px;
+    padding:5px;
+    width:fit-content;
+    margin-bottom:24px;
+  }
+  .tab{
+    padding:9px 18px;
+    border-radius:999px;
+    font-size:13.5px;
+    font-weight:600;
+    color:var(--gray-700);
+    cursor:pointer;
+    transition:background .12s ease, color .12s ease;
+    user-select:none;
+  }
+  .tab:hover{ color:var(--ink); }
+  .tab.active{
+    background:var(--ink);
+    color:#fff;
+  }
+
+  .model-panel{ display:none; }
+  .model-panel.active{ display:block; }
+
+  .table-card{
+    background:var(--card);
+    border-radius:var(--radius);
+    box-shadow:0 1px 2px rgba(16,20,24,0.04), 0 12px 32px rgba(16,20,24,0.06);
+    overflow:hidden;
+  }
+  table{
+    width:100%;
+    border-collapse:collapse;
+  }
+  thead th{
+    text-align:center;
+    font-size:11px;
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+    color:var(--gray-500);
+    font-weight:600;
+    padding:18px 12px 14px;
+    border-bottom:1px solid var(--gray-300);
+  }
+  thead th:first-child{
+    text-align:left;
+    padding-left:24px;
+  }
+  tbody td{
+    text-align:center;
+    padding:16px 12px;
+    font-size:15px;
+    font-weight:600;
+    border-bottom:1px solid var(--gray-100);
+    position:relative;
+  }
+  tbody tr:last-child td{ border-bottom:none; }
+  tbody td:first-child{
+    text-align:left;
+    padding-left:24px;
+    font-weight:700;
+    color:var(--ink);
+  }
+  .node-count{ font-weight:700; }
+  .node-sub{ display:block; font-size:11px; font-weight:500; color:var(--gray-500); margin-top:1px; }
+  .cell-empty{ color:var(--gray-300); font-weight:500; }
+  .cell-price{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-width:64px;
+    padding:6px 10px;
+    border-radius:9px;
+    color:var(--green-dark);
+    cursor:default;
+    transition:background .12s ease, color .12s ease;
+  }
+  .cell-price.hoverable{ cursor:pointer; }
+  .cell-price.hoverable:hover,
+  .cell-price.hoverable.active{
+    background:rgba(34,197,94,0.12);
+  }
+  .price-part-active{ color:var(--green-dark); font-weight:700; }
+  .price-part-expired{ color:var(--gray-500); font-style:italic; font-weight:500; }
+  .price-part-active + .price-part-expired{ margin-left:5px; }
+  .legend, .footnote{
+    margin-top:18px;
+    font-size:12px;
+    color:var(--gray-500);
+  }
+  .footnote{ font-style:italic; margin-top:8px; }
+  .empty-state{
+    padding:40px 24px;
+    text-align:center;
+    color:var(--gray-500);
+    font-size:14px;
+  }
+
+  /* ---------- Tooltip / card ---------- */
+  #tooltip{
+    position:fixed;
+    top:0; left:0;
+    width:300px;
+    background:var(--card);
+    border-radius:18px;
+    box-shadow:0 8px 16px rgba(16,20,24,0.08), 0 24px 48px rgba(16,20,24,0.16);
+    padding:26px 26px 24px;
+    opacity:0;
+    transform:translateY(6px) scale(0.98);
+    pointer-events:none;
+    transition:opacity .12s ease, transform .12s ease;
+    z-index:1000;
+  }
+  #tooltip.show{
+    opacity:1;
+    transform:translateY(0) scale(1);
+  }
+  .tt-title-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin:0 0 18px;
+  }
+  .tt-title{
+    font-size:22px;
+    font-weight:800;
+    margin:0;
+    letter-spacing:-0.01em;
+  }
+  .tt-badge{
+    font-size:10.5px;
+    font-weight:700;
+    letter-spacing:0.05em;
+    text-transform:uppercase;
+    color:var(--gray-500);
+    background:var(--gray-100);
+    border-radius:999px;
+    padding:4px 10px;
+  }
+  .tt-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    padding:10px 0;
+    border-bottom:1px solid var(--gray-100);
+    font-size:13.5px;
+  }
+  .tt-row:first-of-type{ padding-top:0; }
+  .tt-label{ color:var(--gray-500); }
+  .tt-value{ font-weight:700; color:var(--ink); text-align:right; }
+
+  .tt-section-label{
+    color:var(--green-dark);
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:0.07em;
+    text-transform:uppercase;
+    margin:22px 0 4px;
+  }
+  .tt-tier-head{
+    display:flex;
+    justify-content:space-between;
+    font-size:11px;
+    color:var(--gray-500);
+    font-weight:600;
+    letter-spacing:0.03em;
+    text-transform:uppercase;
+    padding:6px 0;
+    border-bottom:1px solid var(--gray-300);
+  }
+  .tt-tier-row{
+    display:flex;
+    justify-content:space-between;
+    font-size:13.5px;
+    padding:9px 0;
+    border-bottom:1px solid var(--gray-100);
+  }
+  .tt-tier-row .term{ color:var(--gray-700); font-weight:500; }
+  .tt-tier-row .price{ font-weight:700; }
+
+  .tt-best{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    margin-top:16px;
+  }
+  .tt-best-label{ font-size:13px; color:var(--gray-700); font-weight:600; }
+  .tt-best-price{
+    font-size:26px;
+    font-weight:800;
+    color:var(--green-dark);
+    line-height:1;
+  }
+  .tt-best-unit{ font-size:12px; color:var(--gray-500); font-weight:600; margin-left:3px; }
+
+  .tt-btn{
+    display:block;
+    text-align:center;
+    margin-top:18px;
+    padding:13px 0;
+    background:var(--green);
+    color:#0B1F12;
+    font-weight:700;
+    font-size:14px;
+    border-radius:999px;
+  }
+  .tt-btn.disabled{
+    background:var(--gray-100);
+    color:var(--gray-500);
+  }
+  .tt-note{
+    margin-top:12px;
+    font-size:11.5px;
+    color:var(--gray-500);
+    font-style:italic;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>GPU supply — pricing matrix</h1>
+  <p class="sub">Sell price ($/GPU-hr), active supply only. Hover a price to see cluster details.</p>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div id="panels"></div>
+
+  <p class="legend">Data: "GPU workstream – Supply" sheet, Status = active. Nodes with no recorded pricing/duration are omitted.</p>
+</div>
+
+<div id="tooltip"></div>
+
+<script>
+const columns = [
+  { key: "m2m", label: "M2M" },
+  { key: "3",   label: "3 months" },
+  { key: "6",   label: "6 months" },
+  { key: "12",  label: "12 months" },
+  { key: "24",  label: "24 months" },
+  { key: "36",  label: "36 months" }
+];
+
+function termToKey(term){
+  if (term.startsWith("3 ")) return "3";
+  if (term.startsWith("6 ")) return "6";
+  if (term.startsWith("12")) return "12";
+  if (term.startsWith("24")) return "24";
+  if (term.startsWith("36")) return "36";
+  return null;
+}
+
+// ---- Model data: active + expired SKUs with a usable node count and duration ----
+const footnotes = {
+  H100: "195-H100 (32 nodes) has no price/duration on record and is omitted.",
+  H200: "175-H200 (40 nodes, $4.11) has no duration on record; 196/197-H200 have no pricing; 203-H200 has no node count. All omitted.",
+  B200: "193-B200 (1 node), 12/13/15/18/20/21/201/202-B200 lack a usable node count, price, or a duration that maps to these 6 columns (e.g. 48- or 60-month terms). All omitted.",
+  B300: "128-node clusters 172/173/174/177/211-B300 are priced at 60-month terms (outside the 6 columns shown). 33/35/36-40/44-46/49-55/69/74/76-80/157/165/169/178/182/189/200/204/205/209/210/213-B300 lack a usable node count, price, or duration. All omitted.",
+  GB300: "190-GB300 (3–4 month term) has no node count on record; 179-GB300 also has a 60-month tier at $3.13 (outside the 6 columns shown). 167/171/214/215-GB300 lack usable pricing or node data.",
+  GB200: ""
+};
+
+const models = {
+  "H100": {
+    clusters: [
+      {id:"84-H100",status:"expired",nodes:8,gpusPerNode:8,config:"SXM",region:"EU, Luxembourg, Luxembourg",available:"10 Jun 2026",tiers:[{key:"6",term:"6 months",price:2.16},{key:"3",term:"3 months",price:2.21}]},
+      {id:"85-H100",status:"expired",nodes:6,gpusPerNode:8,config:"SXM",region:"US",available:"14 Jun 2026",tiers:[{key:"6",term:"6 months",price:1.89}]},
+      {id:"87-H100",status:"expired",nodes:5,gpusPerNode:8,config:"SXM",region:"\u2014",available:"1 Aug 2026",tiers:[{key:"3",term:"3 months",price:1.93}]},
+      {id:"88-H100",status:"expired",nodes:96,gpusPerNode:8,config:"SXM",region:"\u2014",available:"6 Aug 2026",tiers:[{key:"6",term:"6 months",price:2.0}]},
+      {id:"89-H100",status:"expired",nodes:10,gpusPerNode:8,config:"\u2014",region:"APAC, India, New Delhi",available:"28 May 2026",tiers:[{key:"12",term:"12 months",price:1.77}]},
+      {id:"92-H100",status:"expired",nodes:1,gpusPerNode:8,config:"SXM",region:"APAC, Japan",available:"24 Jun 2026",tiers:[{key:"12",term:"12 months",price:1.99}]},
+      {id:"93-H100",status:"expired",nodes:2,gpusPerNode:8,config:"SXM",region:"\u2014",available:"24 Jun 2026",tiers:[{key:"12",term:"12 months",price:2.04}]},
+      {id:"102-H100",status:"expired",nodes:4,gpusPerNode:4,config:"\u2014",region:"EU",available:"30 Jul 2026",tiers:[{key:"12",term:"12 months",price:1.97}]},
+      {id:"108-H100",status:"expired",nodes:16,gpusPerNode:8,config:"\u2014",region:"US, NYC",available:"1 Jul 2026",tiers:[{key:"12",term:"12 months",price:2.25}]},
+      {id:"113-H100",status:"expired",nodes:1,gpusPerNode:8,config:"\u2014",region:"\u2014",available:"\u2014",tiers:[{key:"6",term:"6 months",price:2.17}]},
+      {id:"152-H100",status:"expired",nodes:1,gpusPerNode:8,config:"SXM",region:"US",available:"\u2014",tiers:[{key:"12",term:"12 months",price:2.41}]},
+      {id:"181-H100",status:"active",nodes:13,gpusPerNode:8,config:"SXM",region:"EU",available:"21 Aug 2026",tiers:[{key:"12",term:"12 months",price:2.63}]},
+      {id:"184-H100",status:"active",nodes:4,gpusPerNode:8,config:"SXM",region:"US, Chicago",available:"2 Nov 2026",tiers:[{key:"3",term:"3 months",price:2.63},{key:"6",term:"6 months",price:2.63}]},
+      {id:"185-H100",status:"active",nodes:64,gpusPerNode:8,config:"SXM",region:"US, Chicago",available:"9 Nov 2026",tiers:[{key:"3",term:"3 months",price:2.63},{key:"6",term:"6 months",price:2.63}]},
+      {id:"186-H100",status:"active",nodes:16,gpusPerNode:8,config:"SXM",region:"US, Chicago",available:"15 Dec 2026",tiers:[{key:"3",term:"3 months",price:2.63},{key:"6",term:"6 months",price:2.63}]},
+      {id:"187-H100",status:"active",nodes:16,gpusPerNode:8,config:"SXM",region:"US, Chicago",available:"7 Jan 2027",tiers:[{key:"3",term:"3 months",price:2.63},{key:"6",term:"6 months",price:2.63}]}
+    ]
+  },
+  "H200": {
+    clusters: [
+      {id:"119-H200",status:"expired",nodes:2,gpusPerNode:8,config:"SXM",region:"APAC, Japan",available:"26 Jun 2026",tiers:[{key:"12",term:"12 months",price:2.11}]},
+      {id:"135-H200",status:"expired",nodes:1,gpusPerNode:8,config:"\u2014",region:"\u2014",available:"\u2014",tiers:[{key:"12",term:"12 months",price:2.33}]},
+      {id:"158-H200",status:"active",nodes:1,gpusPerNode:8,config:"PCIE",region:"Noida",available:"\u2014",tiers:[{key:"6",term:"6 months",price:2.42}]},
+      {id:"168-H200",status:"expired",nodes:23,gpusPerNode:8,config:"SXM",region:"APAC, Australia",available:"\u2014",tiers:[{key:"12",term:"12 months",price:3.0}]},
+      {id:"183-H200",status:"expired",nodes:64,gpusPerNode:8,config:"\u2014",region:"\u2014",available:"1 Dec 2026",tiers:[{key:"12",term:"12 months",price:2.95}]},
+      {id:"188-H200",status:"active",nodes:8,gpusPerNode:8,config:"\u2014",region:"US, Chicago",available:"12 Oct 2026",tiers:[{key:"3",term:"3 months",price:3.16},{key:"6",term:"6 months",price:3.16}]}
+    ]
+  },
+  "B200": {
+    clusters: [
+      {id:"6-B200",status:"expired",nodes:128,gpusPerNode:8,config:"\u2014",region:"US",available:"\u2014",tiers:[{key:"36",term:"36 months",price:4.4}]},
+      {id:"8-B200",status:"expired",nodes:4,gpusPerNode:8,config:"\u2014",region:"\u2014",available:"15 Aug 2025",tiers:[{key:"24",term:"24 months",price:4.7}]},
+      {id:"10-B200",status:"expired",nodes:64,gpusPerNode:8,config:"\u2014",region:"US",available:"1 Sep 2026",tiers:[{key:"24",term:"24 months",price:4.4}]},
+      {id:"16-B200",status:"expired",nodes:12,gpusPerNode:8,config:"\u2014",region:"US",available:"10 Jun 2026",tiers:[{key:"24",term:"24 months",price:5.04},{key:"36",term:"36 months",price:3.92}]},
+      {id:"19-B200",status:"expired",nodes:10,gpusPerNode:8,config:"\u2014",region:"US",available:"\u2014",tiers:[{key:"24",term:"24 months",price:4.73}]},
+      {id:"198-B200",status:"active",nodes:1,gpusPerNode:8,config:"\u2014",region:"\u2014",available:"\u2014",tiers:[{key:"6",term:"6 months",price:5.58}]}
+    ]
+  },
+  "B300": {
+    clusters: [
+      {id:"29-B300",status:"expired",nodes:50,gpusPerNode:8,config:"SXM",region:"EU, UK, Chester",available:"~8 weeks from order",tiers:[{key:"12",term:"12 months",price:4.79}]},
+      {id:"30-B300",status:"expired",nodes:1,gpusPerNode:8,config:"SXM",region:"EU, Switzerland",available:"1 Jun 2026",tiers:[{key:"12",term:"12 months",price:6.84}]},
+      {id:"31-B300",status:"active",nodes:128,gpusPerNode:8,config:"SXM",region:"EU, Poland, Poznan",available:"1 Jan 2027",tiers:[{key:"36",term:"36 months",price:4.47},{key:"36",term:"36 months",price:4.84}]},
+      {id:"32-B300",status:"expired",nodes:54,gpusPerNode:8,config:"SXM",region:"US",available:"\u2014",tiers:[{key:"24",term:"24 months",price:4.84}]},
+      {id:"34-B300",status:"expired",nodes:112,gpusPerNode:8,config:"SXM",region:"US, USA, San Jose",available:"1 Oct 2026",tiers:[{key:"36",term:"36 months",price:5.79}]},
+      {id:"43-B300",status:"expired",nodes:72,gpusPerNode:8,config:"SXM",region:"\u2014",available:"\u2014",tiers:[{key:"36",term:"36 months",price:4.45}]},
+      {id:"48-B300",status:"expired",nodes:24,gpusPerNode:8,config:"HGX",region:"US, USA",available:"4-5 weeks",tiers:[{key:"36",term:"36 months",price:4.21}]},
+      {id:"56-B300",status:"expired",nodes:64,gpusPerNode:8,config:"SXM",region:"US",available:"15 Jul 2026",tiers:[{key:"12",term:"12 months",price:4.21},{key:"36",term:"36 months",price:4.05}]},
+      {id:"57-B300",status:"expired",nodes:128,gpusPerNode:8,config:"SXM",region:"EU",available:"1 Aug 2026",tiers:[{key:"36",term:"36 months",price:4.63}]},
+      {id:"70-B300",status:"expired",nodes:128,gpusPerNode:8,config:"\u2014",region:"EU, Germany, Bad Lippspringe",available:"1 Oct 2026",tiers:[{key:"36",term:"36 months",price:3.27}]},
+      {id:"71-B300",status:"expired",nodes:128,gpusPerNode:8,config:"\u2014",region:"EU, Spain",available:"Built to order; 16 weeks from order",tiers:[{key:"36",term:"36 months",price:4.2}]},
+      {id:"73-B300",status:"expired",nodes:125,gpusPerNode:8,config:"\u2014",region:"EU, UK",available:"30 Sep 2026",tiers:[{key:"36",term:"36 months",price:4.7}]},
+      {id:"75-B300",status:"expired",nodes:12,gpusPerNode:8,config:"SXM",region:"EU, Sweden",available:"Immediately",tiers:[{key:"12",term:"12 months",price:7.37}]},
+      {id:"151-B300",status:"expired",nodes:32,gpusPerNode:8,config:"SXM",region:"US, Chicago",available:"1 Aug 2027",tiers:[{key:"36",term:"36 months",price:4.42}]},
+      {id:"155-B300",status:"expired",nodes:100,gpusPerNode:8,config:"\u2014",region:"APAC, India",available:"3 Sep 2026",tiers:[{key:"36",term:"36 months",price:6.32}]},
+      {id:"156-B300",status:"expired",nodes:500,gpusPerNode:8,config:"\u2014",region:"APAC, India",available:"15 Oct 2026",tiers:[{key:"36",term:"36 months",price:6.32}]},
+      {id:"180-B300",status:"active",nodes:32,gpusPerNode:8,config:"\u2014",region:"US, United States",available:"\u2014",tiers:[{key:"36",term:"36 months",price:4.45}]},
+      {id:"207-B300",status:"expired",nodes:10,gpusPerNode:8,config:"SXM",region:"US",available:"\u2014",tiers:[{key:"12",term:"12 months",price:5.89}]},
+      {id:"208-B300",status:"expired",nodes:2,gpusPerNode:8,config:"\u2014",region:"US",available:"1 Sep 2026",tiers:[{key:"24",term:"24 months",price:4.94}]}
+    ]
+  },
+  "GB200": {
+    clusters: [
+      
+    ]
+  },
+  "GB300": {
+    clusters: [
+      {id:"72-B300",status:"expired",nodes:2,gpusPerNode:72,config:"NVL (SXM)",region:"US",available:"1 Sep 2026",tiers:[{key:"36",term:"36 months",price:4.35}]},
+      {id:"82-GB30",status:"expired",nodes:16,gpusPerNode:72,config:"NVL (SXM)",region:"US, USA",available:"30 Sep 2026",tiers:[{key:"36",term:"36 months",price:4.32}]},
+      {id:"179-GB300",status:"active",nodes:1,gpusPerNode:72,config:"NVL (SXM)",region:"EU, Finland",available:"\u2014",tiers:[{key:"36",term:"36 months",price:4.15}]}
+    ]
+  }
+};
+
+const modelOrder = ["H100","H200","B200","B300","GB200","GB300"];
+
+// ---------- Build tabs + panels ----------
+const tabsEl = document.getElementById("tabs");
+const panelsEl = document.getElementById("panels");
+
+modelOrder.forEach((name, i) => {
+  const tab = document.createElement("div");
+  tab.className = "tab" + (i === 0 ? " active" : "");
+  tab.textContent = name;
+  tab.dataset.model = name;
+  tab.addEventListener("click", () => selectModel(name));
+  tabsEl.appendChild(tab);
+
+  const panel = document.createElement("div");
+  panel.className = "model-panel" + (i === 0 ? " active" : "");
+  panel.id = "panel-" + name;
+  panelsEl.appendChild(panel);
+
+  renderModel(name, panel);
+});
+
+function selectModel(name){
+  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.model === name));
+  document.querySelectorAll(".model-panel").forEach(p => p.classList.toggle("active", p.id === "panel-" + name));
+}
+
+function renderModel(name, panel){
+  const modelData = models[name];
+  const clusters = modelData.clusters;
+
+  if (clusters.length === 0){
+    panel.innerHTML = `<div class="table-card"><div class="empty-state">No active or expired supply found for ${name}.</div></div>`;
+    return;
+  }
+
+  const byNodes = {};
+  clusters.forEach(c => {
+    byNodes[c.nodes] = byNodes[c.nodes] || { nodes: c.nodes, entries: [] };
+    byNodes[c.nodes].entries.push(c);
+  });
+  const nodeRows = Object.values(byNodes).sort((a,b) => a.nodes - b.nodes);
+
+  const table = document.createElement("div");
+  table.className = "table-card";
+
+  const headCells = columns.map(c => `<th>${c.label}</th>`).join("");
+  let bodyRows = "";
+
+  nodeRows.forEach(row => {
+    const totalGpus = row.nodes * row.entries[0].gpusPerNode;
+    let rowHtml = `<tr><td><span class="node-count">${row.nodes} nodes</span><span class="node-sub">${totalGpus} GPUs</span></td>`;
+
+    columns.forEach(col => {
+      const matches = row.entries.filter(c => c.tiers.some(t => t.key === col.key));
+      if (matches.length === 0){
+        rowHtml += `<td><span class="cell-empty">—</span></td>`;
+      } else {
+        const activeMatches = matches.filter(c => c.status === "active");
+        const expiredMatches = matches.filter(c => c.status === "expired");
+
+        const activePrice = activeMatches.length
+          ? Math.min(...activeMatches.flatMap(c => c.tiers.filter(t=>t.key===col.key).map(t=>t.price)))
+          : null;
+        const expiredPrice = expiredMatches.length
+          ? Math.min(...expiredMatches.flatMap(c => c.tiers.filter(t=>t.key===col.key).map(t=>t.price)))
+          : null;
+
+        const ids = matches.map(m => m.id).join(",");
+        let inner = "";
+        if (activePrice !== null) inner += `<span class="price-part-active">$${activePrice.toFixed(2)}</span>`;
+        if (expiredPrice !== null) inner += `<span class="price-part-expired">($${expiredPrice.toFixed(2)})</span>`;
+
+        rowHtml += `<td><span class="cell-price hoverable" data-model="${name}" data-cluster-ids="${ids}">${inner}</span></td>`;
+      }
+    });
+
+    rowHtml += `</tr>`;
+    bodyRows += rowHtml;
+  });
+
+  table.innerHTML = `
+    <table>
+      <thead><tr><th>Nodes</th>${headCells}</tr></thead>
+      <tbody>${bodyRows}</tbody>
+    </table>`;
+
+  panel.appendChild(table);
+
+  const footnote = footnotes[name];
+  if (footnote){
+    const fn = document.createElement("p");
+    fn.className = "footnote";
+    fn.textContent = footnote;
+    panel.appendChild(fn);
+  }
+}
+
+// ---------- Tooltip rendering ----------
+const tooltip = document.getElementById("tooltip");
+let activeCell = null;
+
+function renderCard(modelName, cluster){
+  const totalGpus = cluster.nodes * (cluster.gpusPerNode || 0);
+  const minTerm = cluster.tiers[0].term;
+  const best = Math.min(...cluster.tiers.map(t => t.price));
+  const isExpired = cluster.status === "expired";
+
+  const tierRows = cluster.tiers.map(t => `
+    <div class="tt-tier-row">
+      <span class="term">${t.term}</span>
+      <span class="price">$${t.price.toFixed(2)}</span>
+    </div>`).join("");
+
+  const noteHtml = cluster.note ? `<div class="tt-note">${cluster.note}</div>` : "";
+  const badgeHtml = isExpired ? `<span class="tt-badge">Expired</span>` : "";
+  const btnHtml = isExpired
+    ? `<div class="tt-btn disabled">No longer available</div>`
+    : `<div class="tt-btn">Request this cluster</div>`;
+
+  return `
+    <div class="tt-title-row">
+      <div class="tt-title">${modelName}</div>
+      ${badgeHtml}
+    </div>
+
+    <div class="tt-row"><span class="tt-label">GPUs</span><span class="tt-value">${totalGpus} · ${cluster.nodes} nodes</span></div>
+    <div class="tt-row"><span class="tt-label">Configuration</span><span class="tt-value">${cluster.config}</span></div>
+    <div class="tt-row"><span class="tt-label">Region</span><span class="tt-value">${cluster.region}</span></div>
+    <div class="tt-row"><span class="tt-label">Available</span><span class="tt-value">${cluster.available}</span></div>
+    <div class="tt-row"><span class="tt-label">Minimum contract duration</span><span class="tt-value">${minTerm}</span></div>
+
+    <div class="tt-section-label">Pricing tiers · GPU/hr</div>
+    <div class="tt-tier-head"><span>Term</span><span>Price</span></div>
+    ${tierRows}
+    ${noteHtml}
+
+    <div class="tt-best">
+      <span class="tt-best-label">Best price</span>
+      <span><span class="tt-best-price">$${best.toFixed(2)}</span><span class="tt-best-unit">/GPU/hr</span></span>
+    </div>
+
+    ${btnHtml}
+  `;
+}
+
+function renderMulti(modelName, clusterList){
+  const sorted = [...clusterList].sort((a,b) => (a.status === b.status) ? 0 : (a.status === "active" ? -1 : 1));
+  if (sorted.length === 1) return renderCard(modelName, sorted[0]);
+  return sorted.map((c,i) =>
+    renderCard(modelName, c) + (i < sorted.length-1 ? `<hr style="border:none;border-top:1px solid var(--gray-300);margin:18px 0;">` : "")
+  ).join("");
+}
+
+function attachHoverHandlers(){
+  document.querySelectorAll(".cell-price.hoverable").forEach(el => {
+    el.addEventListener("mouseenter", () => {
+      const modelName = el.dataset.model;
+      const ids = el.dataset.clusterIds.split(",");
+      const matched = models[modelName].clusters.filter(c => ids.includes(c.id));
+      tooltip.innerHTML = renderMulti(modelName, matched);
+
+      const rect = el.getBoundingClientRect();
+      const ttWidth = 300;
+      let left = rect.left + rect.width/2 - ttWidth/2;
+      left = Math.max(16, Math.min(left, window.innerWidth - ttWidth - 16));
+      let top = rect.bottom + 10;
+
+      tooltip.style.left = left + "px";
+      tooltip.style.top = top + "px";
+
+      requestAnimationFrame(() => {
+        const ttRect = tooltip.getBoundingClientRect();
+        if (ttRect.bottom > window.innerHeight - 12){
+          tooltip.style.top = (rect.top - ttRect.height - 10) + "px";
+        }
+        tooltip.classList.add("show");
+      });
+
+      el.classList.add("active");
+      activeCell = el;
+    });
+
+    el.addEventListener("mouseleave", () => {
+      tooltip.classList.remove("show");
+      if (activeCell) activeCell.classList.remove("active");
+      activeCell = null;
+    });
+  });
+}
+
+attachHoverHandlers();
+</script>
+</body>
+</html>
