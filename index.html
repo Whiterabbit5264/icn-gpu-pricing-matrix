@@ -146,6 +146,62 @@
     font-size:14px;
   }
 
+  .tab{ display:flex; align-items:center; gap:7px; }
+  .heat-dot{
+    width:9px; height:9px;
+    border-radius:50%;
+    flex-shrink:0;
+    background:var(--gray-300);
+  }
+
+  .cell-demand-wrap{
+    position:relative;
+    display:inline-flex;
+    flex-direction:column;
+    align-items:center;
+    gap:3px;
+  }
+  .cell-price.demand-hit{
+    box-shadow:0 0 0 2px rgba(226,75,74,0.55) inset;
+    background:rgba(226,75,74,0.08);
+  }
+  .demand-only-pill{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-width:64px;
+    padding:6px 10px;
+    border-radius:9px;
+    font-size:12.5px;
+    font-weight:600;
+    color:#791F1F;
+    background:rgba(226,75,74,0.12);
+    box-shadow:0 0 0 1.5px rgba(226,75,74,0.4) inset;
+    cursor:pointer;
+    transition:background .12s ease;
+  }
+  .demand-only-pill:hover,
+  .demand-only-pill.active{
+    background:rgba(226,75,74,0.22);
+  }
+  .demand-badge{
+    font-size:10px;
+    font-weight:700;
+    color:#791F1F;
+  }
+  .demand-row-tag{
+    display:inline-block;
+    font-size:9.5px;
+    font-weight:700;
+    letter-spacing:0.04em;
+    text-transform:uppercase;
+    color:#993C1D;
+    background:#FAECE7;
+    border-radius:5px;
+    padding:2px 6px;
+    margin-top:3px;
+  }
+
   /* ---------- Tooltip / card ---------- */
   #tooltip{
     position:fixed;
@@ -264,18 +320,37 @@
     color:var(--gray-500);
     font-style:italic;
   }
+  .tt-demand-section{
+    margin-top:20px;
+    padding-top:16px;
+    border-top:1px solid var(--gray-300);
+  }
+  .tt-demand-label{
+    color:#A32D2D;
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:0.07em;
+    text-transform:uppercase;
+    margin:0 0 8px;
+  }
+  .tt-demand-row{
+    font-size:13px;
+    color:var(--ink);
+    padding:5px 0;
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>GPU supply — pricing matrix</h1>
-  <p class="sub">Sell price ($/GPU-hr), active supply only. Hover a price to see cluster details.</p>
+  <p class="sub">Sell price ($/GPU-hr). Red-ringed cells are being asked for right now. Hover a price to see cluster details.</p>
 
   <div class="tabs" id="tabs"></div>
+  <p class="legend" id="tab-heat-legend" style="margin-top:-14px; margin-bottom:22px;">Dot color = how many open HubSpot GPU deals (any stage except Closed Won/Lost) are currently asking for that model.</p>
 
   <div id="panels"></div>
 
-  <p class="legend">Data: "GPU workstream – Supply" sheet, Status = active. Nodes with no recorded pricing/duration are omitted.</p>
+  <p class="legend">Supply data: "GPU workstream – Supply" sheet (fresh pull, 18 Aug 2026), Status = active or expired. Demand overlay: HubSpot GPU Sales pipeline, all deal stages except Closed Won and Closed Lost. Rows in red-tinted "Open request" pills have no matching supply on record.</p>
 </div>
 
 <div id="tooltip"></div>
@@ -304,10 +379,52 @@ const footnotes = {
   H100: "195-H100 (32 nodes) has no price/duration on record and is omitted.",
   H200: "175-H200 (40 nodes, $4.11) has no duration on record; 196/197-H200 have no pricing; 203-H200 has no node count. All omitted.",
   B200: "193-B200 (1 node), 12/13/15/18/20/21/201/202-B200 lack a usable node count, price, or a duration that maps to these 6 columns (e.g. 48- or 60-month terms). All omitted.",
-  B300: "128-node clusters 172/173/174/177/211-B300 are priced at 60-month terms (outside the 6 columns shown). 33/35/36-40/44-46/49-55/69/74/76-80/157/165/169/178/182/189/200/204/205/209/210/213-B300 lack a usable node count, price, or duration. All omitted.",
+  B300: "128-node clusters 172/173/174/177/211-B300 are priced at 60-month terms (outside the 6 columns shown). 33/35/36-40/44-46/49-55/69/74/76-80/157/165/169/178/182/189/200/204/205/209/210/213-B300 lack a usable node count, price, or duration. All omitted. The 10,000-node row is a single mega-deal (STS) with no matching supply on record — treat as a distinct outlier, not a typical request size.",
   GB300: "190-GB300 (3–4 month term) has no node count on record; 179-GB300 also has a 60-month tier at $3.13 (outside the 6 columns shown). 167/171/214/215-GB300 lack usable pricing or node data.",
   GB200: ""
 };
+
+// ---- Demand overlay: HubSpot GPU Sales pipeline, open deals only (excl. Closed Won/Lost), pulled 18 Aug 2026 ----
+const modelDemandTotals = {"H100":3,"H200":3,"B200":2,"B300":8,"GB200":0,"GB300":1};
+
+const demandCells = {
+  "H100": [
+      {nodes:8,key:"12",count:1,who:["flona.ai <> TBD; H100 8 Nodes; 12 months"]}
+    ],
+  "H200": [
+      {nodes:40,key:"6",count:1,who:["H200 - 40 nodes - EU / UK - 6 to 12 months"]},
+      {nodes:4,key:"m2m",count:1,who:["R&R <> Hosted.ai; 4 H200 nodes; M2M"]},
+      {nodes:1,key:"6",count:1,who:["Blubridge <> TBD; 1 x H200; 6mo"]}
+    ],
+  "B200": [
+      {nodes:22,key:"24",count:1,who:["InWorld <> TBD; 22 B200 nodes, 24mo"]},
+      {nodes:1,key:"12",count:1,who:["Livup.ai <> TBD; 1 B200/B300 Node; 12 mo"]}
+    ],
+  "B300": [
+      {nodes:128,key:"36",count:1,who:["Tencent <> Yorizon; 128 B300 nodes; 36m"]},
+      {nodes:1,key:"12",count:1,who:["Livup.ai <> TBD; 1 B200/B300 Node; 12 mo"]},
+      {nodes:10000,key:"36",count:1,who:["STS <> TBD; 10k B300s; 36 mo"]},
+      {nodes:36,key:"36",count:1,who:["Novita <> TBD; 36 x B300; 36mo"]},
+      {nodes:500,key:"36",count:1,who:["The Bot Company <> TBD; 500 B300 Nodes; 48mo"]},
+      {nodes:16,key:"12",count:1,who:["Unusual VC <> TBC; 16 x B300; 12mo"]},
+      {nodes:24,key:"6",count:1,who:["InWorld <> TBD; 24 B300; 6mo"]},
+      {nodes:8,key:"12",count:1,who:["UnusualVC <> TBD; 8 B300; 12mo"]}
+    ],
+  "GB200": [
+      
+    ],
+  "GB300": [
+      {nodes:16,key:"36",count:1,who:["Prime Intellect <> TBD; 16 x GB300; 36 mo"]}
+    ]
+};
+
+
+function demandHeatColor(count, max){
+  const ramp = ["#F1EFE8","#FCEBEB","#F7C1C1","#F09595","#E24B4A","#A32D2D","#791F1F"];
+  if (count === 0 || max === 0) return ramp[0];
+  const idx = Math.max(1, Math.ceil((count / max) * (ramp.length - 1)));
+  return ramp[idx];
+}
 
 const models = {
   "H100": {
@@ -337,7 +454,8 @@ const models = {
       {id:"158-H200",status:"active",nodes:1,gpusPerNode:8,config:"PCIE",region:"Noida",available:"\u2014",tiers:[{key:"6",term:"6 months",price:2.42}]},
       {id:"168-H200",status:"expired",nodes:23,gpusPerNode:8,config:"SXM",region:"APAC, Australia",available:"\u2014",tiers:[{key:"12",term:"12 months",price:3.0}]},
       {id:"183-H200",status:"expired",nodes:64,gpusPerNode:8,config:"\u2014",region:"\u2014",available:"1 Dec 2026",tiers:[{key:"12",term:"12 months",price:2.95}]},
-      {id:"188-H200",status:"active",nodes:8,gpusPerNode:8,config:"\u2014",region:"US, Chicago",available:"12 Oct 2026",tiers:[{key:"3",term:"3 months",price:3.16},{key:"6",term:"6 months",price:3.16}]}
+      {id:"188-H200",status:"active",nodes:8,gpusPerNode:8,config:"\u2014",region:"US, Chicago",available:"12 Oct 2026",tiers:[{key:"3",term:"3 months",price:3.16},{key:"6",term:"6 months",price:3.16}]},
+      {id:"225-H200",status:"active",nodes:1,gpusPerNode:8,config:"SXM",region:"US, United States, Washington",available:"Immediate (as of 2026-08-18)",tiers:[{key:"6",term:"6 months",price:2.84}]}
     ]
   },
   "B200": {
@@ -370,7 +488,8 @@ const models = {
       {id:"156-B300",status:"expired",nodes:500,gpusPerNode:8,config:"\u2014",region:"APAC, India",available:"15 Oct 2026",tiers:[{key:"36",term:"36 months",price:6.32}]},
       {id:"180-B300",status:"active",nodes:32,gpusPerNode:8,config:"\u2014",region:"US, United States",available:"\u2014",tiers:[{key:"36",term:"36 months",price:4.45}]},
       {id:"207-B300",status:"expired",nodes:10,gpusPerNode:8,config:"SXM",region:"US",available:"\u2014",tiers:[{key:"12",term:"12 months",price:5.89}]},
-      {id:"208-B300",status:"expired",nodes:2,gpusPerNode:8,config:"\u2014",region:"US",available:"1 Sep 2026",tiers:[{key:"24",term:"24 months",price:4.94}]}
+      {id:"208-B300",status:"expired",nodes:2,gpusPerNode:8,config:"\u2014",region:"US",available:"1 Sep 2026",tiers:[{key:"24",term:"24 months",price:4.94}]},
+      {id:"220-B300",status:"active",nodes:10,gpusPerNode:8,config:"SXM",region:"EU, Netherlands, Amsterdam",available:"8 weeks (as of 2026-08-18)",tiers:[{key:"12",term:"12 months",price:7.25}]}
     ]
   },
   "GB200": {
@@ -386,18 +505,29 @@ const models = {
     ]
   }
 };
-
 const modelOrder = ["H100","H200","B200","B300","GB200","GB300"];
 
 // ---------- Build tabs + panels ----------
 const tabsEl = document.getElementById("tabs");
 const panelsEl = document.getElementById("panels");
 
+const maxDemandTotal = Math.max(...Object.values(modelDemandTotals));
+
 modelOrder.forEach((name, i) => {
   const tab = document.createElement("div");
   tab.className = "tab" + (i === 0 ? " active" : "");
-  tab.textContent = name;
   tab.dataset.model = name;
+
+  const dot = document.createElement("span");
+  dot.className = "heat-dot";
+  dot.style.background = demandHeatColor(modelDemandTotals[name] || 0, maxDemandTotal);
+  dot.title = `${modelDemandTotals[name] || 0} open deal${(modelDemandTotals[name] === 1) ? "" : "s"} requesting this model`;
+  tab.appendChild(dot);
+
+  const label = document.createElement("span");
+  label.textContent = name;
+  tab.appendChild(label);
+
   tab.addEventListener("click", () => selectModel(name));
   tabsEl.appendChild(tab);
 
@@ -417,16 +547,23 @@ function selectModel(name){
 function renderModel(name, panel){
   const modelData = models[name];
   const clusters = modelData.clusters;
+  const demand = demandCells[name] || [];
 
-  if (clusters.length === 0){
-    panel.innerHTML = `<div class="table-card"><div class="empty-state">No active or expired supply found for ${name}.</div></div>`;
+  if (clusters.length === 0 && demand.length === 0){
+    panel.innerHTML = `<div class="table-card"><div class="empty-state">No supply on record and no open requests for ${name}.</div></div>`;
     return;
   }
 
   const byNodes = {};
   clusters.forEach(c => {
-    byNodes[c.nodes] = byNodes[c.nodes] || { nodes: c.nodes, entries: [] };
+    byNodes[c.nodes] = byNodes[c.nodes] || { nodes: c.nodes, entries: [], demandOnly: false };
     byNodes[c.nodes].entries.push(c);
+  });
+  // fold in node counts that only appear in demand, not supply
+  demand.forEach(d => {
+    if (!byNodes[d.nodes]){
+      byNodes[d.nodes] = { nodes: d.nodes, entries: [], demandOnly: true };
+    }
   });
   const nodeRows = Object.values(byNodes).sort((a,b) => a.nodes - b.nodes);
 
@@ -437,13 +574,21 @@ function renderModel(name, panel){
   let bodyRows = "";
 
   nodeRows.forEach(row => {
-    const totalGpus = row.nodes * row.entries[0].gpusPerNode;
-    let rowHtml = `<tr><td><span class="node-count">${row.nodes} nodes</span><span class="node-sub">${totalGpus} GPUs</span></td>`;
+    const gpusPerNode = row.entries.length ? row.entries[0].gpusPerNode : (name === "GB300" ? 72 : 8);
+    const totalGpus = row.nodes * gpusPerNode;
+    const rowDemandTag = row.demandOnly ? `<span class="demand-row-tag">Open request</span>` : "";
+    let rowHtml = `<tr><td><span class="node-count">${row.nodes} nodes</span><span class="node-sub">${totalGpus} GPUs</span>${rowDemandTag}</td>`;
 
     columns.forEach(col => {
       const matches = row.entries.filter(c => c.tiers.some(t => t.key === col.key));
+      const demandMatch = demand.find(d => d.nodes === row.nodes && d.key === col.key);
+
       if (matches.length === 0){
-        rowHtml += `<td><span class="cell-empty">—</span></td>`;
+        if (demandMatch){
+          rowHtml += `<td><div class="cell-demand-wrap"><span class="demand-only-pill hoverable-demand" data-who="${demandMatch.who.join('|||')}" data-count="${demandMatch.count}">Open request</span><span class="demand-badge">${demandMatch.count}×</span></div></td>`;
+        } else {
+          rowHtml += `<td><span class="cell-empty">—</span></td>`;
+        }
       } else {
         const activeMatches = matches.filter(c => c.status === "active");
         const expiredMatches = matches.filter(c => c.status === "expired");
@@ -460,7 +605,11 @@ function renderModel(name, panel){
         if (activePrice !== null) inner += `<span class="price-part-active">$${activePrice.toFixed(2)}</span>`;
         if (expiredPrice !== null) inner += `<span class="price-part-expired">($${expiredPrice.toFixed(2)})</span>`;
 
-        rowHtml += `<td><span class="cell-price hoverable" data-model="${name}" data-cluster-ids="${ids}">${inner}</span></td>`;
+        const demandClass = demandMatch ? " demand-hit" : "";
+        const demandAttrs = demandMatch ? ` data-who="${demandMatch.who.join('|||')}" data-count="${demandMatch.count}"` : "";
+        const badge = demandMatch ? `<span class="demand-badge">${demandMatch.count}×</span>` : "";
+
+        rowHtml += `<td><div class="cell-demand-wrap"><span class="cell-price hoverable${demandClass}" data-model="${name}" data-cluster-ids="${ids}"${demandAttrs}>${inner}</span>${badge}</div></td>`;
       }
     });
 
@@ -541,31 +690,61 @@ function renderMulti(modelName, clusterList){
   ).join("");
 }
 
+function renderDemandSection(who){
+  const rows = who.map(name => `<div class="tt-demand-row">${name}</div>`).join("");
+  return `
+    <div class="tt-demand-section">
+      <div class="tt-demand-label">Open request${who.length > 1 ? "s" : ""} · HubSpot pipeline</div>
+      ${rows}
+    </div>`;
+}
+
+function positionAndShowTooltip(el){
+  const rect = el.getBoundingClientRect();
+  const ttWidth = 300;
+  let left = rect.left + rect.width/2 - ttWidth/2;
+  left = Math.max(16, Math.min(left, window.innerWidth - ttWidth - 16));
+  let top = rect.bottom + 10;
+
+  tooltip.style.left = left + "px";
+  tooltip.style.top = top + "px";
+
+  requestAnimationFrame(() => {
+    const ttRect = tooltip.getBoundingClientRect();
+    if (ttRect.bottom > window.innerHeight - 12){
+      tooltip.style.top = (rect.top - ttRect.height - 10) + "px";
+    }
+    tooltip.classList.add("show");
+  });
+}
+
 function attachHoverHandlers(){
   document.querySelectorAll(".cell-price.hoverable").forEach(el => {
     el.addEventListener("mouseenter", () => {
       const modelName = el.dataset.model;
       const ids = el.dataset.clusterIds.split(",");
       const matched = models[modelName].clusters.filter(c => ids.includes(c.id));
-      tooltip.innerHTML = renderMulti(modelName, matched);
+      let html = renderMulti(modelName, matched);
+      if (el.dataset.who){
+        html += renderDemandSection(el.dataset.who.split("|||"));
+      }
+      tooltip.innerHTML = html;
+      positionAndShowTooltip(el);
+      el.classList.add("active");
+      activeCell = el;
+    });
 
-      const rect = el.getBoundingClientRect();
-      const ttWidth = 300;
-      let left = rect.left + rect.width/2 - ttWidth/2;
-      left = Math.max(16, Math.min(left, window.innerWidth - ttWidth - 16));
-      let top = rect.bottom + 10;
+    el.addEventListener("mouseleave", () => {
+      tooltip.classList.remove("show");
+      if (activeCell) activeCell.classList.remove("active");
+      activeCell = null;
+    });
+  });
 
-      tooltip.style.left = left + "px";
-      tooltip.style.top = top + "px";
-
-      requestAnimationFrame(() => {
-        const ttRect = tooltip.getBoundingClientRect();
-        if (ttRect.bottom > window.innerHeight - 12){
-          tooltip.style.top = (rect.top - ttRect.height - 10) + "px";
-        }
-        tooltip.classList.add("show");
-      });
-
+  document.querySelectorAll(".hoverable-demand").forEach(el => {
+    el.addEventListener("mouseenter", () => {
+      tooltip.innerHTML = renderDemandSection(el.dataset.who.split("|||"));
+      positionAndShowTooltip(el);
       el.classList.add("active");
       activeCell = el;
     });
