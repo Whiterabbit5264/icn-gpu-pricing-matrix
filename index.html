@@ -220,6 +220,7 @@
   #tooltip.show{
     opacity:1;
     transform:translateY(0) scale(1);
+    pointer-events:auto;
   }
   .tt-title-row{
     display:flex;
@@ -344,6 +345,12 @@
 <div class="wrap">
   <h1>GPU supply — pricing matrix</h1>
   <p class="sub">Sell price ($/GPU-hr). Red-ringed cells are being asked for right now. Hover a price to see cluster details.</p>
+
+  <div style="display:flex; align-items:center; gap:18px; margin:14px 0 4px; font-size:12.5px; color:var(--gray-700);">
+    <span style="display:flex; align-items:center; gap:6px;"><span style="width:10px;height:10px;border-radius:3px;background:var(--green-dark);"></span>Available now</span>
+    <span style="display:flex; align-items:center; gap:6px;"><span style="width:10px;height:10px;border-radius:3px;background:var(--gray-500);"></span>Expired</span>
+    <span style="display:flex; align-items:center; gap:6px;"><span style="width:10px;height:10px;border-radius:3px;border:2px solid #E24B4A;background:rgba(226,75,74,0.08);"></span>Open request</span>
+  </div>
 
   <div class="tabs" id="tabs"></div>
   <p class="legend" id="tab-heat-legend" style="margin-top:-14px; margin-bottom:22px;">Dot color = how many open HubSpot GPU deals (any stage except Closed Won/Lost) are currently asking for that model.</p>
@@ -718,9 +725,28 @@ function positionAndShowTooltip(el){
   });
 }
 
+let hideTimer = null;
+
+function cancelHide(){
+  if (hideTimer){
+    clearTimeout(hideTimer);
+    hideTimer = null;
+  }
+}
+
+function scheduleHide(){
+  cancelHide();
+  hideTimer = setTimeout(() => {
+    tooltip.classList.remove("show");
+    if (activeCell) activeCell.classList.remove("active");
+    activeCell = null;
+  }, 200);
+}
+
 function attachHoverHandlers(){
   document.querySelectorAll(".cell-price.hoverable").forEach(el => {
     el.addEventListener("mouseenter", () => {
+      cancelHide();
       const modelName = el.dataset.model;
       const ids = el.dataset.clusterIds.split(",");
       const matched = models[modelName].clusters.filter(c => ids.includes(c.id));
@@ -734,27 +760,23 @@ function attachHoverHandlers(){
       activeCell = el;
     });
 
-    el.addEventListener("mouseleave", () => {
-      tooltip.classList.remove("show");
-      if (activeCell) activeCell.classList.remove("active");
-      activeCell = null;
-    });
+    el.addEventListener("mouseleave", scheduleHide);
   });
 
   document.querySelectorAll(".hoverable-demand").forEach(el => {
     el.addEventListener("mouseenter", () => {
+      cancelHide();
       tooltip.innerHTML = renderDemandSection(el.dataset.who.split("|||"));
       positionAndShowTooltip(el);
       el.classList.add("active");
       activeCell = el;
     });
 
-    el.addEventListener("mouseleave", () => {
-      tooltip.classList.remove("show");
-      if (activeCell) activeCell.classList.remove("active");
-      activeCell = null;
-    });
+    el.addEventListener("mouseleave", scheduleHide);
   });
+
+  tooltip.addEventListener("mouseenter", cancelHide);
+  tooltip.addEventListener("mouseleave", scheduleHide);
 }
 
 attachHoverHandlers();
